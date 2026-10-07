@@ -17,6 +17,7 @@ npm run lint
 |---|---|
 | `VITE_API_URL` | API origin. Empty means same origin (Vite proxy in dev, Render in production). |
 | `VITE_USE_MOCK` | `true` swaps in the in-browser mock API. Production builds with it off contain no mock code or data. |
+| `VITE_PROXY_TARGET` | Dev-server proxy target for `/api`; must match the backend `PORT`. Defaults to `http://localhost:5000`. |
 
 ## Structure
 

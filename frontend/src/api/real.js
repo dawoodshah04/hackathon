@@ -36,8 +36,13 @@ export async function getMyTasks() {
   return data
 }
 
-export async function createDraft(transcript) {
-  const { data } = await http.post('/api/transcripts/draft', { transcript }, { timeout: TRANSCRIPT_TIMEOUT_MS })
+export async function getInsights() {
+  const { data } = await http.get('/api/insights')
+  return data
+}
+
+export async function createDraft(transcript, { meetingDate } = {}) {
+  const { data } = await http.post('/api/transcripts/draft', { transcript, meetingDate }, { timeout: TRANSCRIPT_TIMEOUT_MS })
   return data
 }
 

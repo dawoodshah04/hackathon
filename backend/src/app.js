@@ -1,6 +1,7 @@
 'use strict';
 
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
@@ -15,6 +16,7 @@ const teamRouter = require('./routes/team');
 const projectsRouter = require('./routes/projects');
 const tasksRouter = require('./routes/tasks');
 const transcriptsRouter = require('./routes/transcripts');
+const insightsRouter = require('./routes/insights');
 
 const app = express();
 
@@ -31,6 +33,8 @@ app.use(
   })
 );
 
+// Gzip JSON and static files: the biggest win on slow connections.
+app.use(compression());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
 
@@ -41,6 +45,7 @@ app.use('/api/team', teamRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/transcripts', transcriptsRouter);
+app.use('/api/insights', insightsRouter);
 
 // JSON 404 for unknown /api/* routes
 app.use('/api/*', (req, res) => {
@@ -50,7 +55,12 @@ app.use('/api/*', (req, res) => {
 // Serve the built React frontend in production (one service)
 if (env.serveFrontend) {
   const distPath = path.resolve(__dirname, '../../frontend/dist');
-  app.use(express.static(distPath));
+  // Vite fingerprints everything under /assets, so those files never change and can be cached for good.
+  app.use(
+    '/assets',
+    express.static(path.join(distPath, 'assets'), { immutable: true, maxAge: '1y', fallthrough: false })
+  );
+  app.use(express.static(distPath, { maxAge: 0 }));
   // SPA fallback: any non-/api GET returns index.html
   app.get('*', (req, res) => {
     res.sendFile(path.join(distPath, 'index.html'));

@@ -5,8 +5,8 @@ const mockDraft = require('./mockDraft');
 
 /**
  * Calls the AI module to extract a project draft from a meeting transcript.
- * When AI_MODE=mock, returns the fixed development draft.
- * When AI_MODE=live, lazily requires ../ai (may not exist until the AI branch is merged).
+ * When AI_MODE=live (the default), lazily requires ../ai.
+ * When AI_MODE=mock, returns the fixed development draft and ignores the transcript.
  *
  * @param {{ transcript: string, directory: Array }} params
  * @returns {Promise<{ projects: Array }>}
@@ -19,6 +19,15 @@ async function extractDraft({ transcript, directory }) {
       '   Set AI_MODE=live in backend/.env before the demo.\n'
     );
     return mockDraft();
+  }
+
+  if (env.groqApiKeys.length === 0 && env.hfApiKeys.length === 0) {
+    const err = new Error(
+      'No AI API keys configured. Set GROQ_API_KEYS (or HF_API_KEYS) in backend/.env.'
+    );
+    err.code = 'AI_FAILED';
+    err.statusCode = 502;
+    throw err;
   }
 
   // Lazy require: the AI module lives in ../ai (feat/ai branch). 
@@ -39,7 +48,7 @@ async function extractDraft({ transcript, directory }) {
     const result = await aiModule.extractProjectsFromTranscript({
       transcript,
       directory,
-      meetingDate: '2026-10-07',
+      meetingDate: new Date().toISOString().slice(0, 10),
     });
     return result;
   } catch (aiErr) {

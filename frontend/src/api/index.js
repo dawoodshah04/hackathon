@@ -9,4 +9,4 @@ export const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 
 const api = USE_MOCK ? mockApi : realApi
 
-export const { login, me, getTeam, getProjects, getProject, getMyTasks, createDraft, commitDraft } = api
+export const { login, me, getTeam, getProjects, getProject, getMyTasks, getInsights, createDraft, commitDraft } = api

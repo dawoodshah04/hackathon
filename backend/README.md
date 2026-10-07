@@ -16,7 +16,8 @@ cp .env.example .env
 # Edit .env and fill in:
 #   MONGODB_URI  — your Atlas connection string (must include /novaworks)
 #   JWT_SECRET   — any long random string
-#   AI_MODE=mock — use "live" for the real demo
+#   GROQ_API_KEYS — at least one key (AI_MODE=live is the default)
+#   AI_MODE=mock only returns a fixed sample draft and IGNORES the transcript
 ```
 
 ### 3. Seed demo accounts
@@ -55,10 +56,10 @@ BASE_URL=http://localhost:5000 node tests/access.test.js
 | `JWT_EXPIRES_IN` | | 8h | JWT expiry |
 | `CLIENT_ORIGIN` | | http://localhost:5173 | Comma-separated CORS origins |
 | `SERVE_FRONTEND` | | false | Set `true` in production to serve React build |
-| `AI_MODE` | | mock | `mock` (dev) or `live` (demo/prod) |
+| `AI_MODE` | | live | `live` (real AI extraction) or `mock` (fixed sample draft, ignores the transcript) |
 | `GROQ_API_KEYS` | | — | Comma-separated Groq API keys |
-| `GROQ_MODEL` | | llama-3.3-70b-versatile | Primary Groq model |
-| `GROQ_FALLBACK_MODEL` | | llama-3.1-8b-instant | Fallback Groq model |
+| `GROQ_MODEL` | | openai/gpt-oss-120b | Primary Groq model |
+| `GROQ_FALLBACK_MODEL` | | openai/gpt-oss-20b | Fallback Groq model |
 | `HF_API_KEYS` | | — | Comma-separated HF keys |
 | `HF_MODEL` | | mistralai/Mistral-7B-Instruct-v0.3 | HF model |
 | `AI_TIMEOUT_MS` | | 60000 | AI request timeout |

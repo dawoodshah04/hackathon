@@ -1,6 +1,7 @@
-import { useEffect } from 'react'
+import { Suspense, useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Navbar from './Navbar'
+import Spinner from './Spinner'
 
 export default function Layout() {
   const { pathname } = useLocation()
@@ -19,7 +20,15 @@ export default function Layout() {
       </a>
       <Navbar />
       <main id="main" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 outline-none sm:px-6 lg:px-8 lg:py-10">
-        <Outlet />
+        <Suspense
+          fallback={
+            <div className="grid place-items-center py-24 text-brand-700">
+              <Spinner size="lg" label="Loading page" />
+            </div>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

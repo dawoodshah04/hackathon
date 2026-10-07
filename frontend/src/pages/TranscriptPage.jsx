@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { USE_MOCK, commitDraft, createDraft, getTeam } from '../api'
 import Button from '../components/Button'
 import ErrorBanner from '../components/ErrorBanner'
-import { Label, Textarea } from '../components/Field'
+import { Input, Label, Textarea } from '../components/Field'
 import PageHeader from '../components/PageHeader'
 import { useToast } from '../components/Toast'
 import CommitSuccess from '../components/transcript/CommitSuccess'
@@ -19,8 +19,8 @@ import {
   updateDraftField,
   buildPath,
 } from '../lib/draft'
-import { countWords, pluralize } from '../lib/format'
-import { useAsync } from '../lib/useAsync'
+import { countWords, pluralize, todayISO } from '../lib/format'
+import { invalidate, useAsync } from '../lib/useAsync'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 // Stage indexes into PROCESSING_STEPS.
@@ -28,6 +28,7 @@ const STAGE = { READING: 0, EXTRACTING: 1, VALIDATING: 2, SAVING: 3 }
 
 const GUIDANCE = [
   'Paste the whole meeting. Later corrections and the final recap take priority over earlier statements.',
+  'Set the meeting date so phrases like “next Friday” or “in two weeks” become the right calendar dates.',
   'People are matched against the team directory. Anyone the AI cannot match is flagged for you to choose.',
   'Every date and assignment is validated on the server. Nothing is saved unless the whole draft is valid.',
 ]
@@ -44,9 +45,10 @@ export default function TranscriptPage() {
   useDocumentTitle('Create from Transcript')
   const { user } = useAuth()
   const toast = useToast()
-  const team = useAsync(getTeam, [user.id])
+  const team = useAsync(getTeam, [user.id], { cacheKey: `team:${user.id}` })
 
   const [transcript, setTranscript] = useState('')
+  const [meetingDate, setMeetingDate] = useState(todayISO)
   const [view, setView] = useState('compose') // compose | processing | review | success | failed
   const [stage, setStage] = useState(STAGE.READING)
   const [draft, setDraft] = useState(null)
@@ -76,6 +78,9 @@ export default function TranscriptPage() {
 
   const finish = useCallback(
     (response) => {
+      // New projects and tasks: every cached list is now out of date.
+      invalidate('projects:')
+      invalidate('insights:')
       setResult(response)
       setView('success')
       window.scrollTo({ top: 0 })
@@ -105,7 +110,7 @@ export default function TranscriptPage() {
 
     let generated = null
     try {
-      const response = await createDraft(transcript)
+      const response = await createDraft(transcript, { meetingDate: meetingDate || undefined })
       generated = response.draft
       clearTimeout(stageTimer.current)
       setStage(STAGE.VALIDATING)
@@ -329,7 +334,16 @@ export default function TranscriptPage() {
                     Clear
                   </Button>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 text-[13px] text-stone-600" title="Used to resolve relative dates like “next Friday”">
+                    Meeting date
+                    <Input
+                      type="date"
+                      value={meetingDate}
+                      onChange={(event) => setMeetingDate(event.target.value)}
+                      className="h-8 w-[9.5rem] text-[13px]"
+                    />
+                  </label>
                   <kbd className="hidden font-sans text-xs text-stone-400 sm:inline">Ctrl / ⌘ + Enter</kbd>
                   <Button onClick={generate} disabled={!canSubmit}>
                     Create from Transcript

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import * as api from '../api'
 import { onUnauthorized, tokenStore } from '../api/client'
+import { invalidate } from '../lib/useAsync'
 
 const AuthContext = createContext(null)
 
@@ -51,6 +52,7 @@ export function AuthProvider({ children }) {
   useEffect(
     () =>
       onUnauthorized(() => {
+        invalidate()
         setUser(null)
         setStatus('anonymous')
         setSessionExpired(true)
@@ -61,6 +63,7 @@ export function AuthProvider({ children }) {
   const signIn = useCallback(async (email, password) => {
     const { token, user: signedIn } = await api.login(email, password)
     tokenStore.set(token)
+    invalidate()
     setUser(signedIn)
     setStatus('authenticated')
     setSessionExpired(false)
@@ -69,6 +72,7 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(() => {
     tokenStore.clear()
+    invalidate()
     setUser(null)
     setStatus('anonymous')
     setSessionExpired(false)

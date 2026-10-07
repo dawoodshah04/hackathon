@@ -2,6 +2,9 @@ import { ArrowUpRight, CalendarCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { getMyTasks } from '../api'
 import { Person } from '../components/Avatar'
+import BarList from '../components/charts/BarList'
+import ChartCard, { StatusLegend } from '../components/charts/ChartCard'
+import Timeline from '../components/charts/Timeline'
 import DueDate from '../components/DueDate'
 import EmptyState from '../components/EmptyState'
 import ErrorBanner from '../components/ErrorBanner'
@@ -11,6 +14,7 @@ import Skeleton, { SkeletonGroup } from '../components/Skeleton'
 import StatStrip from '../components/StatStrip'
 import { useAuth } from '../context/AuthContext'
 import { formatDate, formatHours, pluralize, sumBy } from '../lib/format'
+import { statusCounts, taskRows } from '../lib/insights'
 import { useAsync } from '../lib/useAsync'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
@@ -77,10 +81,14 @@ function ProjectGroup({ project, tasks }) {
 export default function MyTasksPage() {
   useDocumentTitle('My tasks')
   const { user } = useAuth()
-  const { data, error, loading, reload } = useAsync(getMyTasks, [user.id])
+  const { data, error, loading, reload } = useAsync(getMyTasks, [user.id], { cacheKey: `mine:${user.id}` })
   const tasks = data?.tasks ?? []
   const groups = groupByProject(tasks)
   const next = groups[0]?.tasks[0]
+  const counts = statusCounts(tasks)
+  const byProject = groups
+    .map((group) => ({ ...group, hours: sumBy(group.tasks, 'estimatedHours') }))
+    .sort((a, b) => b.hours - a.hours)
 
   return (
     <div className="space-y-8">
@@ -115,6 +123,33 @@ export default function MyTasksPage() {
               { label: 'Next deadline', value: next ? formatDate(next.deadline) : '—' },
             ]}
           />
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <ChartCard
+              id="my-timeline"
+              title="My timeline"
+              description="Each bar is a task's estimated effort at 8 h/day, ending on its deadline."
+              legend={<StatusLegend statuses={['overdue', 'soon', 'ontrack'].filter((key) => counts[key] > 0)} />}
+            >
+              <Timeline
+                rows={taskRows(tasks, { sublabel: (task) => task.project?.name })}
+                ariaLabel="My tasks by deadline"
+                labelHeading="Task"
+              />
+            </ChartCard>
+            <ChartCard id="by-project" title="Hours by project" description="Where your estimated effort goes.">
+              <BarList
+                ariaLabel="Hours per project"
+                items={byProject.map((group) => ({
+                  id: group.project.id,
+                  label: group.project.name,
+                  value: group.hours,
+                  valueLabel: formatHours(group.hours),
+                  detail: `${group.project.clientName ?? ''} · ${pluralize(group.tasks.length, 'task')}`,
+                  to: `/projects/${group.project.id}`,
+                }))}
+              />
+            </ChartCard>
+          </div>
           <div className="space-y-5">
             {groups.map((group) => (
               <ProjectGroup key={group.project.id} project={group.project} tasks={group.tasks} />

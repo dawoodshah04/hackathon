@@ -52,7 +52,7 @@ async function pingKeys() {
     process.exit(1);
   }
 
-  const model = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  const model = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
   const keys = (process.env.GROQ_API_KEYS || '').split(',').map((k) => k.trim()).filter(Boolean);
   const seen = new Set();
   const unique = keys.filter((k) => seen.has(k) ? false : seen.add(k));
@@ -68,7 +68,7 @@ async function pingKeys() {
         model,
         messages: [{ role: 'user', content: 'Return only this JSON object: {"ok":true}' }],
         temperature: 0,
-        max_tokens: 20,
+        max_tokens: 256, // reasoning models (gpt-oss) spend tokens thinking before answering
       };
       if (useJsonMode) bodyObj.response_format = { type: 'json_object' };
 
