@@ -63,23 +63,32 @@ async function pingKeys() {
     const suffix = `...${key.slice(-4)}`;
     const start = Date.now();
     try {
+      const useJsonMode = !model.startsWith('openai/');
+      const bodyObj = {
+        model,
+        messages: [{ role: 'user', content: 'Return only this JSON object: {"ok":true}' }],
+        temperature: 0,
+        max_tokens: 20,
+      };
+      if (useJsonMode) bodyObj.response_format = { type: 'json_object' };
+
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${key}`,
         },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: 'Say OK. JSON: {"ok":true}' }],
-          temperature: 0,
-          max_tokens: 10,
-          response_format: { type: 'json_object' },
-        }),
+        body: JSON.stringify(bodyObj),
       });
       const ms = Date.now() - start;
       if (res.status === 200) {
-        console.log(`  ${suffix}  OK  (${ms}ms)`);
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (!content || !content.trim()) {
+          console.log(`  ${suffix}  EMPTY RESPONSE (model may not be usable for text)`);
+        } else {
+          console.log(`  ${suffix}  OK  (${ms}ms)  response="${content.slice(0, 40)}"`);
+        }
       } else if (res.status === 429) {
         const ra = res.headers.get('retry-after');
         console.log(`  ${suffix}  RATE-LIMITED  retry-after=${ra || '?'}s`);

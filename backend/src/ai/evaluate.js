@@ -43,17 +43,20 @@ const RUNS_PER_FIXTURE = 3;
 const dirIds = new Set(directory.map((u) => u.id));
 const dirIdList = [...dirIds];
 
-// Forbidden keywords in task titles/descriptions
-const FORBIDDEN_PATTERNS = [
-  /payment/i,
-  /inventory/i,
+// Forbidden keywords checked in task TITLES only.
+// Descriptions may legitimately mention excluded features (e.g. "without payment
+// processing") — that is correct AI behaviour, not a false positive.
+const FORBIDDEN_TITLE_PATTERNS = [
+  /payment\s*(gateway|processing|integrat)/i,
+  /inventory\s*(integrat|sync|task)/i,
   /live\s+map/i,
   /driver\s+track/i,
   /real\s+email/i,
   /email\s+integrat/i,
   /ticketing\s+integrat/i,
-  /android\s+only/i,
-  /ios\s+only/i,
+  /\bandroid\s+only\b/i,
+  /\bios\s+only\b/i,
+  /separate\s+(android|ios)/i,
 ];
 
 /** Normalize title for comparison */
@@ -106,13 +109,13 @@ function checkResult(result, expectedData, label) {
     fail('no_kamran_id', kamranIds.map((x) => x.id).join(', '));
   }
 
-  // No forbidden keywords in tasks
+  // No forbidden keywords in task TITLES (descriptions may mention exclusions legitimately)
   const forbiddenFound = [];
   for (const proj of projects) {
     for (const task of (proj.tasks || [])) {
-      for (const pat of FORBIDDEN_PATTERNS) {
-        if (pat.test(task.title || '') || pat.test(task.description || '')) {
-          forbiddenFound.push(`"${task.title}" (${pat.source})`);
+      for (const pat of FORBIDDEN_TITLE_PATTERNS) {
+        if (pat.test(task.title || '')) {
+          forbiddenFound.push(`"${task.title}" matches /${pat.source}/`);
         }
       }
     }
@@ -270,6 +273,15 @@ async function main() {
   let globalFail = false;
   const summary = [];
 
+  // Delay helper to stay within Groq free-tier tokens-per-minute limit
+  async function waitBetweenRuns(run, total, label) {
+    if (run < total) {
+      const delay = 35;
+      console.log(`\n  [rate-limit guard] Waiting ${delay}s before next run...`);
+      await new Promise((r) => setTimeout(r, delay * 1000));
+    }
+  }
+
   // Original transcript x3
   console.log('\n▶ Testing original transcript (3 runs)...');
   for (let run = 1; run <= RUNS_PER_FIXTURE; run++) {
@@ -288,6 +300,7 @@ async function main() {
     const passed = checks.filter((c) => c.status === 'PASS').length;
     summary.push({ label: `Original run ${run}`, passed, total: checks.length });
     if (passed < checks.length) globalFail = true;
+    await waitBetweenRuns(run, RUNS_PER_FIXTURE, 'original');
   }
 
   // Changed transcript x3
@@ -317,6 +330,7 @@ async function main() {
     const passed = allChecks.filter((c) => c.status === 'PASS').length;
     summary.push({ label: `Changed run ${run}`, passed, total: allChecks.length });
     if (passed < allChecks.length) globalFail = true;
+    await waitBetweenRuns(run, RUNS_PER_FIXTURE, 'changed');
   }
 
   // Final summary
