@@ -1,0 +1,126 @@
+'use strict';
+
+/**
+ * Mock draft returned when AI_MODE=mock.
+ * Based on the answer key from SHARED CONTEXT section 11.
+ * FOR DEVELOPMENT USE ONLY. Never shown to judges as "real AI output."
+ */
+function mockDraft() {
+  return {
+    projects: [
+      {
+        name: 'UrbanCart Website',
+        clientName: 'UrbanCart Clothing',
+        description: 'Website development for UrbanCart Clothing featuring product catalog, cart, and integrations.',
+        managerId: 'PM01',
+        deadline: '2026-10-20',
+        tasks: [
+          {
+            title: 'Product catalog UI',
+            description: 'Design and build the product catalog user interface.',
+            assigneeId: 'DEV01',
+            deadline: '2026-10-12',
+            estimatedHours: 12,
+          },
+          {
+            title: 'Demo cart UI',
+            description: 'Build the shopping cart UI for demo purposes.',
+            assigneeId: 'DEV01',
+            deadline: '2026-10-15',
+            estimatedHours: 8,
+          },
+          {
+            title: 'Product and cart APIs',
+            description: 'Develop backend APIs for product listings and cart operations.',
+            assigneeId: 'DEV02',
+            deadline: '2026-10-14',
+            estimatedHours: 14,
+          },
+          {
+            title: 'Website integration and testing',
+            description: 'Integrate frontend and backend; perform end-to-end testing.',
+            assigneeId: 'DEV01',
+            deadline: '2026-10-19',
+            estimatedHours: 6,
+          },
+        ],
+      },
+      {
+        name: 'QuickServe Mobile App',
+        clientName: 'QuickServe Services',
+        description: 'Mobile application for QuickServe Services with booking and account management.',
+        managerId: 'PM02',
+        deadline: '2026-10-24',
+        tasks: [
+          {
+            title: 'Login and profile screens',
+            description: 'Implement login and user profile screens.',
+            assigneeId: 'DEV03',
+            deadline: '2026-10-12',
+            estimatedHours: 8,
+          },
+          {
+            title: 'Service booking screens',
+            description: 'Build service booking flow UI.',
+            assigneeId: 'DEV03',
+            deadline: '2026-10-17',
+            estimatedHours: 12,
+          },
+          {
+            title: 'Booking and account APIs',
+            description: 'Develop backend APIs for booking and account operations.',
+            assigneeId: 'DEV02',
+            deadline: '2026-10-16',
+            estimatedHours: 16,
+          },
+          {
+            title: 'Mobile integration and testing',
+            description: 'Integrate all mobile features and perform testing.',
+            assigneeId: 'DEV04',
+            deadline: '2026-10-22',
+            estimatedHours: 10,
+          },
+        ],
+      },
+      {
+        name: 'HelpDeskPro AI Assistant',
+        clientName: 'HelpDeskPro Solutions',
+        description: 'AI-powered assistant for HelpDeskPro Solutions with FAQ processing and escalation flow.',
+        managerId: 'PM03',
+        deadline: '2026-10-22',
+        tasks: [
+          {
+            title: 'FAQ document processing',
+            description: 'Process and index FAQ documents for retrieval.',
+            assigneeId: 'DEV06',
+            deadline: '2026-10-13',
+            estimatedHours: 10,
+          },
+          {
+            title: 'Assistant answer generation',
+            description: 'Build LLM-powered answer generation module.',
+            assigneeId: 'DEV05',
+            deadline: '2026-10-17',
+            estimatedHours: 14,
+          },
+          {
+            title: 'Human escalation flow',
+            description: 'Implement human escalation when the AI cannot answer.',
+            assigneeId: 'DEV05',
+            deadline: '2026-10-18',
+            estimatedHours: 6,
+          },
+          {
+            title: 'Assistant evaluation and testing',
+            description: 'Evaluate assistant quality and perform end-to-end testing.',
+            assigneeId: 'DEV06',
+            deadline: '2026-10-21',
+            estimatedHours: 8,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+module.exports = mockDraft;
