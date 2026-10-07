@@ -1,0 +1,65 @@
+[
+  {
+    "id": "PM01",
+    "name": "Ayesha Khan",
+    "role": "MANAGER",
+    "specialization": "Web PM",
+    "skills": ["Web projects", "client coordination"]
+  },
+  {
+    "id": "PM02",
+    "name": "Bilal Ahmed",
+    "role": "MANAGER",
+    "specialization": "Mobile PM",
+    "skills": ["Mobile projects", "delivery planning"]
+  },
+  {
+    "id": "PM03",
+    "name": "Hina Malik",
+    "role": "MANAGER",
+    "specialization": "AI PM",
+    "skills": ["AI projects", "requirement review"]
+  },
+  {
+    "id": "DEV01",
+    "name": "Ali Raza",
+    "role": "AGENT",
+    "specialization": "Full-Stack",
+    "skills": ["React", "frontend integration"]
+  },
+  {
+    "id": "DEV02",
+    "name": "Hamza Shah",
+    "role": "AGENT",
+    "specialization": "Full-Stack",
+    "skills": ["Node.js", "databases", "APIs"]
+  },
+  {
+    "id": "DEV03",
+    "name": "Sara Noor",
+    "role": "AGENT",
+    "specialization": "App Developer",
+    "skills": ["Flutter", "mobile UI"]
+  },
+  {
+    "id": "DEV04",
+    "name": "Usman Tariq",
+    "role": "AGENT",
+    "specialization": "App Developer",
+    "skills": ["Flutter", "integration", "testing"]
+  },
+  {
+    "id": "DEV05",
+    "name": "Zain Abbas",
+    "role": "AGENT",
+    "specialization": "AI Developer",
+    "skills": ["LLMs", "extraction", "prompts"]
+  },
+  {
+    "id": "DEV06",
+    "name": "Maryam Asif",
+    "role": "AGENT",
+    "specialization": "AI Developer",
+    "skills": ["Retrieval", "document processing"]
+  }
+]
