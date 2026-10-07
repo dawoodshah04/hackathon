@@ -24,11 +24,15 @@ function seedDb() {
 
 function loadDb() {
   if (cachedDb) return cachedDb
+  let stored = null
   try {
-    cachedDb = JSON.parse(localStorage.getItem(DB_KEY)) ?? seedDb()
+    stored = JSON.parse(localStorage.getItem(DB_KEY))
   } catch {
-    cachedDb = seedDb()
+    /* corrupted or unavailable: reseed */
   }
+  // Persist the seed straight away so ids stay stable across reloads.
+  if (stored) cachedDb = stored
+  else saveDb(seedDb())
   return cachedDb
 }
 
