@@ -44,8 +44,8 @@ The backend calls this via `backend/src/services/aiAdapter.js` when `AI_MODE=liv
 | Variable | Default | Description |
 |---|---|---|
 | `GROQ_API_KEYS` | *(required)* | Comma-separated Groq API keys |
-| `GROQ_MODEL` | `llama-3.3-70b-versatile` | Primary Groq model |
-| `GROQ_FALLBACK_MODEL` | `llama-3.1-8b-instant` | Fallback Groq model |
+| `GROQ_MODEL` | `openai/gpt-oss-120b` | Primary Groq model |
+| `GROQ_FALLBACK_MODEL` | `openai/gpt-oss-20b` | Fallback Groq model |
 | `HF_API_KEYS` | *(optional)* | Comma-separated HF keys (fallback provider) |
 | `HF_MODEL` | `meta-llama/Llama-3.1-8B-Instruct` | HF model |
 | `AI_TIMEOUT_MS` | `60000` | Per-request abort timeout in ms |

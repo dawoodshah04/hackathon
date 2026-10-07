@@ -116,8 +116,8 @@ async function extractProjectsFromTranscript({ transcript, directory, meetingDat
 
   const timeoutMs = parseInt(process.env.AI_TIMEOUT_MS || '60000', 10);
 
-  const groqModel = process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
-  const groqFallback = process.env.GROQ_FALLBACK_MODEL || 'llama-3.1-8b-instant';
+  const groqModel = process.env.GROQ_MODEL || 'openai/gpt-oss-120b';
+  const groqFallback = process.env.GROQ_FALLBACK_MODEL || 'openai/gpt-oss-20b';
   const hfModel = process.env.HF_MODEL || 'meta-llama/Llama-3.1-8B-Instruct';
 
   const groqPool = createPool(process.env.GROQ_API_KEYS);
