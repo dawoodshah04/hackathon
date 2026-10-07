@@ -90,7 +90,8 @@ export const LOGIN_PATH = '/api/auth/login'
 
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '',
-  timeout: 30_000,
+  // Render's free tier sleeps when idle and needs up to a minute to wake.
+  timeout: 75_000,
   headers: { 'Content-Type': 'application/json' },
 })
 

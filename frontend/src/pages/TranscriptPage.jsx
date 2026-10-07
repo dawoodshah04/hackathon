@@ -29,7 +29,7 @@ const STAGE = { READING: 0, EXTRACTING: 1, VALIDATING: 2, SAVING: 3 }
 const GUIDANCE = [
   'Paste the whole meeting. Later corrections and the final recap take priority over earlier statements.',
   'Set the meeting date so phrases like “next Friday” or “in two weeks” become the right calendar dates.',
-  'People are matched against the team directory. Anyone the AI cannot match is flagged for you to choose.',
+  'Nothing to fill in by hand: the AI picks the client, manager, assignees, estimates and deadlines, using the team directory when the meeting does not say.',
   'Every date and assignment is validated on the server. Nothing is saved unless the whole draft is valid.',
 ]
 
@@ -122,7 +122,13 @@ export default function TranscriptPage() {
       }
 
       setStage(STAGE.SAVING)
-      finish(await commitDraft(generated))
+      const saved = await commitDraft(generated)
+      finish(saved)
+      if (response.filled?.length) {
+        toast.info('Filled in automatically', {
+          description: `${pluralize(response.filled.length, 'detail')} the meeting didn't state were chosen by the AI.`,
+        })
+      }
     } catch (err) {
       clearTimeout(stageTimer.current)
       if (err.code === 'VALIDATION_FAILED' && generated) {

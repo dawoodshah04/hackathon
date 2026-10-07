@@ -28,8 +28,14 @@ router.post('/draft', auth, requireRole('ADMIN'), async (req, res, next) => {
       });
     }
 
-    const { draft, issues } = await processDraft(transcript);
-    return res.status(200).json({ draft, issues });
+    const requested = req.body.meetingDate;
+    const meetingDate =
+      typeof requested === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(requested)
+        ? requested
+        : new Date().toISOString().slice(0, 10);
+
+    const { draft, issues, filled } = await processDraft(transcript, meetingDate);
+    return res.status(200).json({ draft, issues, filled });
   } catch (err) {
     if (err.code === 'AI_FAILED' || err.statusCode === 502) {
       return res.status(502).json({

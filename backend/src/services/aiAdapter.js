@@ -12,7 +12,7 @@ const mockDraft = require('./mockDraft');
  * @returns {Promise<{ projects: Array }>}
  * @throws  Error with .code='AI_FAILED' and .statusCode=502 on AI failures
  */
-async function extractDraft({ transcript, directory }) {
+async function extractDraft({ transcript, directory, meetingDate }) {
   if (env.aiMode !== 'live') {
     console.warn(
       '\n⚠️  WARNING: AI_MODE=mock — returning fixed development draft, NOT real AI output.\n' +
@@ -48,7 +48,7 @@ async function extractDraft({ transcript, directory }) {
     const result = await aiModule.extractProjectsFromTranscript({
       transcript,
       directory,
-      meetingDate: new Date().toISOString().slice(0, 10),
+      meetingDate: meetingDate || new Date().toISOString().slice(0, 10),
     });
     return result;
   } catch (aiErr) {

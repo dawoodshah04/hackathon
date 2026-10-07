@@ -6,6 +6,7 @@ const Project = require('../models/Project');
 const Task = require('../models/Task');
 const { extractDraft } = require('./aiAdapter');
 const { validateDraft } = require('../validation/draftValidator');
+const { autofillDraft } = require('./draftAutofill');
 
 // In-memory per-user commit lock to prevent concurrent double-commits
 const commitLocks = new Set();
@@ -40,14 +41,25 @@ async function getUsersForValidation() {
  * POST /api/transcripts/draft
  * Runs AI extraction + validation. Saves nothing.
  */
-async function processDraft(transcript) {
-  const directory = await buildDirectory();
-  const draft = await extractDraft({ transcript, directory });
+async function processDraft(transcript, meetingDate) {
+  const [directory, agentHoursRows, managerRows, usersForValidation] = await Promise.all([
+    buildDirectory(),
+    Task.aggregate([{ $group: { _id: '$assigneeId', hours: { $sum: '$estimatedHours' } } }]),
+    Project.aggregate([{ $group: { _id: '$managerId', count: { $sum: 1 } } }]),
+    getUsersForValidation(),
+  ]);
+  const aiDraft = await extractDraft({ transcript, directory, meetingDate });
 
-  const usersForValidation = await getUsersForValidation();
+  // Fill anything the meeting left unstated so the draft is complete without manual input.
+  const { draft, filled } = autofillDraft(aiDraft, {
+    directory,
+    meetingDate,
+    agentHours: new Map(agentHoursRows.map((r) => [String(r._id), r.hours])),
+    managerProjects: new Map(managerRows.map((r) => [String(r._id), r.count])),
+  });
+
   const { issues } = validateDraft(draft, usersForValidation);
-
-  return { draft, issues };
+  return { draft, issues, filled };
 }
 
 /**

@@ -1,0 +1,32 @@
+# Render Blueprint for the API. Secrets are marked sync: false — set them in the Render dashboard.
+services:
+  - type: web
+    name: hackathon-api
+    runtime: node
+    rootDir: backend
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: AI_MODE
+        value: live
+      - key: SERVE_FRONTEND
+        value: "false"
+      - key: CLIENT_ORIGIN
+        value: https://*.vercel.app,http://localhost:5173
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GROQ_FALLBACK_MODEL
+        value: openai/gpt-oss-20b
+      - key: AI_TIMEOUT_MS
+        value: "60000"
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEYS
+        sync: false
+      - key: HF_API_KEYS
+        sync: false
