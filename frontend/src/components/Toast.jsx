@@ -89,8 +89,9 @@ export function ToastProvider({ children }) {
       <ol
         aria-live="polite"
         className={cx(
-          'pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 p-4',
-          'sm:inset-x-auto sm:right-0 sm:items-end sm:p-6',
+          // Top-right, under the navbar, so toasts never cover sticky action bars at the bottom.
+          'pointer-events-none fixed inset-x-0 top-14 z-50 flex flex-col items-center gap-2 p-4',
+          'sm:inset-x-auto sm:right-0 sm:items-end sm:px-6',
         )}
       >
         {toasts.map((toast) => (
