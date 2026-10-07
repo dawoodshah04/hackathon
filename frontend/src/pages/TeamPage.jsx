@@ -1,5 +1,5 @@
 import { Mail } from 'lucide-react'
-import { getTeam } from '../api'
+import { getInsights, getTeam } from '../api'
 import Avatar from '../components/Avatar'
 import Badge, { RoleBadge } from '../components/Badge'
 import ErrorBanner from '../components/ErrorBanner'
@@ -7,6 +7,8 @@ import PageHeader from '../components/PageHeader'
 import Skeleton, { SkeletonGroup } from '../components/Skeleton'
 import { useAuth } from '../context/AuthContext'
 import { cx } from '../lib/cx'
+import { formatHours, pluralize } from '../lib/format'
+import { workloadByPerson } from '../lib/insights'
 import { useAsync } from '../lib/useAsync'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
@@ -16,7 +18,31 @@ const SECTIONS = [
   { role: 'AGENT', title: 'Developers' },
 ]
 
-function MemberCard({ member, isYou }) {
+function WorkloadMeter({ load, max, scopeLabel }) {
+  const hours = load?.hours ?? 0
+  return (
+    <div className="mt-4">
+      <div className="flex justify-between gap-3 text-xs">
+        <span className="text-stone-500">{scopeLabel}</span>
+        <span className="font-medium text-stone-800 tabular-nums">
+          {load ? `${formatHours(hours)} · ${pluralize(load.count, 'task')}` : 'No tasks'}
+        </span>
+      </div>
+      <div
+        role="meter"
+        aria-label={scopeLabel}
+        aria-valuemin={0}
+        aria-valuemax={Math.round(max)}
+        aria-valuenow={Math.round(hours)}
+        className="mt-1.5 h-1.5 overflow-hidden rounded-r-[4px] bg-brand-50"
+      >
+        <div className="h-full rounded-r-[4px] bg-brand-500" style={{ width: `${max > 0 ? (hours / max) * 100 : 0}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function MemberCard({ member, isYou, workload }) {
   return (
     <article
       className={cx(
@@ -44,6 +70,7 @@ function MemberCard({ member, isYou }) {
           ))}
         </ul>
       )}
+      {workload && member.role === 'AGENT' && <WorkloadMeter {...workload} />}
       {member.email && (
         <a
           href={`mailto:${member.email}`}
@@ -60,7 +87,15 @@ function MemberCard({ member, isYou }) {
 export default function TeamPage() {
   useDocumentTitle('Team')
   const { user } = useAuth()
-  const { data, error, loading, reload } = useAsync(getTeam, [user.id])
+  const { data, error, loading, reload } = useAsync(getTeam, [user.id], { cacheKey: `team:${user.id}` })
+  // Workload is only meaningful to the people who plan work.
+  const canSeeWorkload = user.role === 'ADMIN' || user.role === 'MANAGER'
+  const insights = useAsync(() => (canSeeWorkload ? getInsights() : Promise.resolve(null)), [user.id], {
+    cacheKey: canSeeWorkload ? `insights:${user.id}` : undefined,
+  })
+  const loads = new Map(workloadByPerson(insights.data?.tasks ?? []).map((person) => [person.id, person]))
+  const maxLoad = Math.max(0, ...[...loads.values()].map((person) => person.hours))
+  const scopeLabel = user.role === 'ADMIN' ? 'Assigned work' : 'Work in your projects'
   const users = data?.users ?? []
 
   return (
@@ -89,7 +124,11 @@ export default function TeamPage() {
             <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {members.map((member) => (
                 <li key={member.id}>
-                  <MemberCard member={member} isYou={member.id === user.id} />
+                  <MemberCard
+                    member={member}
+                    isYou={member.id === user.id}
+                    workload={insights.data ? { load: loads.get(member.id), max: maxLoad, scopeLabel } : null}
+                  />
                 </li>
               ))}
             </ul>

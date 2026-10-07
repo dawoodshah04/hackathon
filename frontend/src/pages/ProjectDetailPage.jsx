@@ -3,31 +3,23 @@ import { Link, useParams } from 'react-router-dom'
 import { getProject } from '../api'
 import Avatar, { Person } from '../components/Avatar'
 import { ButtonLink } from '../components/Button'
+import BarList from '../components/charts/BarList'
+import ChartCard, { StatusLegend } from '../components/charts/ChartCard'
+import Timeline from '../components/charts/Timeline'
 import DueDate from '../components/DueDate'
 import EmptyState from '../components/EmptyState'
 import ErrorBanner from '../components/ErrorBanner'
 import Skeleton, { SkeletonGroup } from '../components/Skeleton'
+import StatusBadge from '../components/StatusBadge'
 import TaskTable, { TaskTableSkeleton } from '../components/TaskTable'
 import { useAuth } from '../context/AuthContext'
 import { formatHours, pluralize, sumBy } from '../lib/format'
+import { statusCounts, taskRows, workloadByPerson } from '../lib/insights'
 import { useAsync } from '../lib/useAsync'
 import { useDocumentTitle } from '../lib/useDocumentTitle'
 
 function backLinkFor(role) {
   return role === 'AGENT' ? { to: '/my-tasks', label: 'My tasks' } : { to: '/', label: role === 'ADMIN' ? 'Projects' : 'My projects' }
-}
-
-/** Hours per assignee, largest first. */
-function workload(tasks) {
-  const byPerson = new Map()
-  for (const task of tasks) {
-    if (!task.assignee) continue
-    const entry = byPerson.get(task.assignee.id) ?? { ...task.assignee, hours: 0, count: 0 }
-    entry.hours += Number(task.estimatedHours) || 0
-    entry.count += 1
-    byPerson.set(task.assignee.id, entry)
-  }
-  return [...byPerson.values()].sort((a, b) => b.hours - a.hours)
 }
 
 // 403 and 404 deliberately look the same, so the page never confirms that a
@@ -62,13 +54,14 @@ export default function ProjectDetailPage() {
   const { id } = useParams()
   const { user } = useAuth()
   const back = backLinkFor(user.role)
-  const { data, error, loading, reload } = useAsync(() => getProject(id), [id, user.id])
+  const { data, error, loading, reload } = useAsync(() => getProject(id), [id, user.id], { cacheKey: `project:${user.id}:${id}` })
   useDocumentTitle(data?.project?.name ?? 'Project')
 
   const noAccess = error && (error.status === 403 || error.status === 404)
   const project = data?.project
   const tasks = data?.tasks ?? []
-  const people = workload(tasks)
+  const people = workloadByPerson(tasks)
+  const counts = statusCounts(tasks)
 
   return (
     <div>
@@ -98,7 +91,10 @@ export default function ProjectDetailPage() {
       {project && (
         <>
           <header className="mt-4">
-            <p className="text-[13px] font-medium text-stone-500">{project.clientName}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[13px] font-medium text-stone-500">{project.clientName}</p>
+              <StatusBadge deadline={project.deadline} />
+            </div>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-[1.625rem]">{project.name}</h1>
             {project.description && (
               <p className="mt-2 max-w-3xl text-sm leading-relaxed text-stone-600">{project.description}</p>
@@ -120,6 +116,39 @@ export default function ProjectDetailPage() {
             </Meta>
           </dl>
 
+          {tasks.length > 0 && (
+            <div className={user.role === 'AGENT' ? 'mt-6' : 'mt-6 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]'}>
+              <ChartCard
+                id="task-timeline"
+                title="Task timeline"
+                description="Each bar is the task's estimated effort at 8 h/day, ending on its deadline."
+                legend={<StatusLegend statuses={['overdue', 'soon', 'ontrack'].filter((key) => counts[key] > 0)} />}
+              >
+                <Timeline
+                  rows={taskRows(tasks)}
+                  references={[{ date: project.deadline, label: 'Project deadline' }]}
+                  ariaLabel="Tasks by deadline"
+                  labelHeading="Task"
+                />
+              </ChartCard>
+              {user.role !== 'AGENT' && people.length > 0 && (
+                <ChartCard id="effort" title="Effort by developer" description="Estimated hours in this project.">
+                  <BarList
+                    ariaLabel="Hours per developer in this project"
+                    items={people.map((person) => ({
+                      id: person.id,
+                      label: person.name,
+                      leading: <Avatar id={person.id} name={person.name} size="xs" />,
+                      value: person.hours,
+                      valueLabel: formatHours(person.hours),
+                      detail: pluralize(person.count, 'task'),
+                    }))}
+                  />
+                </ChartCard>
+              )}
+            </div>
+          )}
+
           <section aria-labelledby="tasks-heading" className="mt-10">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
               <div>
@@ -133,21 +162,6 @@ export default function ProjectDetailPage() {
                   </p>
                 )}
               </div>
-              {user.role !== 'AGENT' && people.length > 0 && (
-                <ul aria-label="Effort by developer" className="flex flex-wrap gap-1.5">
-                  {people.map((person) => (
-                    <li
-                      key={person.id}
-                      title={`${person.name}: ${pluralize(person.count, 'task')}`}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 bg-white py-0.5 pr-2.5 pl-0.5 text-xs text-stone-700"
-                    >
-                      <Avatar id={person.id} name={person.name} size="xs" />
-                      {person.name.split(' ')[0]}
-                      <span className="font-medium text-stone-900 tabular-nums">{formatHours(person.hours)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </div>
             {tasks.length > 0 ? (
               <TaskTable tasks={tasks} />

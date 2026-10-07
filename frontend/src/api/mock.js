@@ -61,6 +61,7 @@ function insertDraft(db, draft) {
       description: project.description ?? '',
       managerId: project.managerId,
       deadline: project.deadline,
+      createdAt: new Date().toISOString().slice(0, 10),
     })
     for (const task of project.tasks ?? []) {
       db.tasks.push({
@@ -125,8 +126,8 @@ const byDeadline = (a, b) => a.deadline.localeCompare(b.deadline)
 const sumHours = (tasks) => tasks.reduce((total, task) => total + task.estimatedHours, 0)
 
 function projectSummary(project) {
-  const { id, name, clientName, description, deadline } = project
-  return { id, name, clientName, description, deadline, manager: ref(project.managerId) }
+  const { id, name, clientName, description, deadline, createdAt = null } = project
+  return { id, name, clientName, description, deadline, createdAt, manager: ref(project.managerId) }
 }
 
 function taskView(task) {
@@ -231,6 +232,20 @@ export async function getProject(id) {
   return { project: projectSummary(project), tasks: [...tasks].sort(byDeadline).map(taskView) }
 }
 
+export async function getInsights() {
+  await latency()
+  const user = currentUser()
+  const db = loadDb()
+  const tasks = []
+  for (const project of db.projects) {
+    for (const task of visibleTasks(db, user, project) ?? []) {
+      const { description: _description, ...slim } = taskView(task)
+      tasks.push(slim)
+    }
+  }
+  return { tasks }
+}
+
 export async function getMyTasks() {
   await latency()
   const user = currentUser()
@@ -250,7 +265,7 @@ export async function getMyTasks() {
   return { tasks, totalHours: sumHours(tasks) }
 }
 
-export async function createDraft(transcript) {
+export async function createDraft(transcript, _options) {
   const user = currentUser()
   requireRole(user, 'ADMIN')
   if (!isText(transcript)) fail(400, 'EMPTY_TRANSCRIPT', 'Paste a meeting transcript first')

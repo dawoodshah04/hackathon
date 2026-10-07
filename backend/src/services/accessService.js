@@ -3,57 +3,31 @@
 const mongoose = require('mongoose');
 const Project = require('../models/Project');
 const Task = require('../models/Task');
-const User = require('../models/User');
+const { getUserNames, personRef } = require('./userDirectory');
 
-/**
- * Returns the list of projects the given user may see,
- * with taskCount and totalHours computed only from tasks the user may see,
- * and manager:{id,name} embedded.
- *
- * No N+1: uses aggregation or two queries per role.
- */
-async function listProjectsFor(user) {
-  // Step 1: determine which project ids the user may access
-  let projectIds = null; // null = all
+/** "YYYY-MM-DD" the project was created, read from its ObjectId (works for old documents too). */
+function createdDate(project) {
+  return project._id.getTimestamp().toISOString().slice(0, 10);
+}
 
-  if (user.role === 'ADMIN') {
-    projectIds = null; // all
-  } else if (user.role === 'MANAGER') {
-    const projects = await Project.find({ managerId: user._id }, '_id').lean();
-    projectIds = projects.map((p) => p._id);
-  } else {
-    // AGENT: projects that have at least one task assigned to them
-    const tasks = await Task.find({ assigneeId: user._id }, 'projectId').lean();
-    const uniqueIds = [...new Set(tasks.map((t) => t.projectId.toString()))];
-    projectIds = uniqueIds.map((id) => new mongoose.Types.ObjectId(id));
-  }
+function forbidden() {
+  const err = new Error('You do not have access to this project');
+  err.statusCode = 403;
+  err.code = 'FORBIDDEN';
+  return err;
+}
 
-  // Step 2: build task aggregation pipeline filter
-  const taskMatchStage =
-    user.role === 'ADMIN'
-      ? {}
-      : user.role === 'MANAGER'
-      ? { assigneeId: { $exists: true } } // manager sees all tasks in their projects
-      : { assigneeId: user._id }; // agent sees only their own tasks
+function notFound() {
+  const err = new Error('Project not found');
+  err.statusCode = 404;
+  err.code = 'NOT_FOUND';
+  return err;
+}
 
-  // Step 3: aggregate projects with per-user task counts and hours
-  const projectFilter = projectIds === null ? {} : { _id: { $in: projectIds } };
-
-  // Fetch projects
-  const projects = await Project.find(projectFilter).lean();
-
-  if (projects.length === 0) return [];
-
-  const projectIdList = projects.map((p) => p._id);
-
-  // Build task aggregation
-  const taskAgg = await Task.aggregate([
-    {
-      $match: {
-        projectId: { $in: projectIdList },
-        ...(user.role === 'AGENT' ? { assigneeId: user._id } : {}),
-      },
-    },
+/** Task count and hours per project, for the tasks matching `match`. */
+function taskTotals(match) {
+  return Task.aggregate([
+    { $match: match },
     {
       $group: {
         _id: '$projectId',
@@ -62,18 +36,39 @@ async function listProjectsFor(user) {
       },
     },
   ]);
+}
 
-  const taskMap = {};
-  for (const row of taskAgg) {
-    taskMap[row._id.toString()] = { taskCount: row.taskCount, totalHours: row.totalHours };
+/**
+ * Returns the list of projects the given user may see,
+ * with taskCount and totalHours computed only from tasks the user may see,
+ * and manager:{id,name} embedded.
+ *
+ * Atlas is a network round trip away, so each role uses as few sequential
+ * queries as possible; names come from the cached directory.
+ */
+async function listProjectsFor(user) {
+  let projects;
+  let totals;
+  const namesPromise = getUserNames();
+
+  if (user.role === 'ADMIN') {
+    // Everything is visible: both queries can run at once.
+    [projects, totals] = await Promise.all([Project.find({}).lean(), taskTotals({})]);
+  } else if (user.role === 'MANAGER') {
+    projects = await Project.find({ managerId: user._id }).lean();
+    totals = projects.length ? await taskTotals({ projectId: { $in: projects.map((p) => p._id) } }) : [];
+  } else {
+    // AGENT: the projects are exactly those their tasks belong to, so the totals come first.
+    totals = await taskTotals({ assigneeId: user._id });
+    projects = totals.length ? await Project.find({ _id: { $in: totals.map((row) => row._id) } }).lean() : [];
   }
 
-  // Fetch all managers at once (no N+1)
-  const managerIds = [...new Set(projects.map((p) => p.managerId))];
-  const managers = await User.find({ _id: { $in: managerIds } }, '_id name').lean();
-  const managerMap = {};
-  for (const m of managers) {
-    managerMap[m._id] = m.name;
+  if (projects.length === 0) return [];
+  const names = await namesPromise;
+
+  const taskMap = {};
+  for (const row of totals) {
+    taskMap[row._id.toString()] = { taskCount: row.taskCount, totalHours: row.totalHours };
   }
 
   return projects.map((p) => {
@@ -84,7 +79,8 @@ async function listProjectsFor(user) {
       clientName: p.clientName,
       description: p.description,
       deadline: p.deadline,
-      manager: { id: p.managerId, name: managerMap[p.managerId] || '' },
+      createdAt: createdDate(p),
+      manager: personRef(names, p.managerId),
       taskCount: stats.taskCount,
       totalHours: stats.totalHours,
     };
@@ -97,44 +93,19 @@ async function listProjectsFor(user) {
  */
 async function getProjectFor(user, projectId) {
   // Validate ObjectId
-  if (!mongoose.Types.ObjectId.isValid(projectId)) {
-    const err = new Error('Project not found');
-    err.statusCode = 404;
-    err.code = 'NOT_FOUND';
-    throw err;
-  }
+  if (!mongoose.Types.ObjectId.isValid(projectId)) throw notFound();
 
   const project = await Project.findById(projectId).lean();
-  if (!project) {
-    const err = new Error('Project not found');
-    err.statusCode = 404;
-    err.code = 'NOT_FOUND';
-    throw err;
-  }
+  if (!project) throw notFound();
 
   // Check access
-  if (user.role === 'MANAGER' && project.managerId !== user._id) {
-    const err = new Error('You do not have access to this project');
-    err.statusCode = 403;
-    err.code = 'FORBIDDEN';
-    throw err;
-  }
+  if (user.role === 'MANAGER' && project.managerId !== user._id) throw forbidden();
 
-  if (user.role === 'AGENT') {
-    // Agent must have at least one task in this project
-    const hasTask = await Task.exists({ projectId: project._id, assigneeId: user._id });
-    if (!hasTask) {
-      const err = new Error('You do not have access to this project');
-      err.statusCode = 403;
-      err.code = 'FORBIDDEN';
-      throw err;
-    }
-  }
+  // The agent access check, the tasks and the names are independent: fetch them together.
+  const [tasks, names] = await Promise.all([getTasksFor(user, project._id), getUserNames()]);
 
-  // Fetch manager name
-  const manager = await User.findById(project.managerId, '_id name').lean();
-
-  const tasks = await getTasksFor(user, project._id);
+  // Agent must have at least one task in this project (their task list is already filtered to them)
+  if (user.role === 'AGENT' && tasks.length === 0) throw forbidden();
 
   return {
     project: {
@@ -143,7 +114,8 @@ async function getProjectFor(user, projectId) {
       clientName: project.clientName,
       description: project.description,
       deadline: project.deadline,
-      manager: { id: project.managerId, name: manager ? manager.name : '' },
+      createdAt: createdDate(project),
+      manager: personRef(names, project.managerId),
     },
     tasks,
   };
@@ -160,25 +132,47 @@ async function getTasksFor(user, projectId) {
   }
   // MANAGER: must manage the project (caller already checked); ADMIN: all tasks
 
-  const tasks = await Task.find(filter).lean();
-
-  // Fetch assignees in one query (no N+1)
-  const assigneeIds = [...new Set(tasks.map((t) => t.assigneeId))];
-  const assignees = await User.find({ _id: { $in: assigneeIds } }, '_id name').lean();
-  const assigneeMap = {};
-  for (const a of assignees) {
-    assigneeMap[a._id] = a.name;
-  }
+  const [tasks, names] = await Promise.all([Task.find(filter).lean(), getUserNames()]);
 
   return tasks.map((t) => ({
     id: t._id.toString(),
     projectId: t.projectId.toString(),
     title: t.title,
     description: t.description,
-    assignee: { id: t.assigneeId, name: assigneeMap[t.assigneeId] || '' },
+    assignee: personRef(names, t.assigneeId),
     deadline: t.deadline,
     estimatedHours: t.estimatedHours,
   }));
+}
+
+/**
+ * Slim list of every task the user may see across their projects, for the
+ * dashboard charts (workload, timeline). No descriptions, to keep it small.
+ */
+async function listInsightsFor(user) {
+  const taskFilter = {};
+  if (user.role === 'AGENT') {
+    taskFilter.assigneeId = user._id;
+  } else if (user.role === 'MANAGER') {
+    const projectIds = await Project.distinct('_id', { managerId: user._id });
+    taskFilter.projectId = { $in: projectIds };
+  }
+
+  const [tasks, names] = await Promise.all([
+    Task.find(taskFilter, 'projectId title assigneeId deadline estimatedHours').lean(),
+    getUserNames(),
+  ]);
+
+  return {
+    tasks: tasks.map((t) => ({
+      id: t._id.toString(),
+      projectId: t.projectId.toString(),
+      title: t.title,
+      assignee: personRef(names, t.assigneeId),
+      deadline: t.deadline,
+      estimatedHours: t.estimatedHours,
+    })),
+  };
 }
 
 /**
@@ -193,7 +187,10 @@ async function listMyTasks(user) {
     throw err;
   }
 
-  const tasks = await Task.find({ assigneeId: user._id }).sort({ deadline: 1 }).lean();
+  const [tasks, names] = await Promise.all([
+    Task.find({ assigneeId: user._id }).sort({ deadline: 1 }).lean(),
+    getUserNames(),
+  ]);
 
   // Fetch projects in one query
   const projectIds = [...new Set(tasks.map((t) => t.projectId.toString()))];
@@ -201,19 +198,13 @@ async function listMyTasks(user) {
     _id: { $in: projectIds.map((id) => new mongoose.Types.ObjectId(id)) },
   }).lean();
 
-  // Fetch managers for those projects
-  const managerIds = [...new Set(projects.map((p) => p.managerId))];
-  const managers = await User.find({ _id: { $in: managerIds } }, '_id name').lean();
-  const managerMap = {};
-  for (const m of managers) managerMap[m._id] = m.name;
-
   const projectMap = {};
   for (const p of projects) {
     projectMap[p._id.toString()] = {
       id: p._id.toString(),
       name: p.name,
       clientName: p.clientName,
-      manager: { id: p.managerId, name: managerMap[p.managerId] || '' },
+      manager: personRef(names, p.managerId),
     };
   }
 
@@ -232,4 +223,4 @@ async function listMyTasks(user) {
   return { tasks: result, totalHours };
 }
 
-module.exports = { listProjectsFor, getProjectFor, getTasksFor, listMyTasks };
+module.exports = { listProjectsFor, getProjectFor, getTasksFor, listMyTasks, listInsightsFor };
