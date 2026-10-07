@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Pine: the single accent colour used for primary actions and focus. */
+  --color-brand-50: #eff8f5;
+  --color-brand-100: #d8f0e7;
+  --color-brand-200: #b3e1d0;
+  --color-brand-300: #81cbb3;
+  --color-brand-400: #4dae93;
+  --color-brand-500: #2a9178;
+  --color-brand-600: #1c7764;
+  --color-brand-700: #196455;
+  --color-brand-800: #175046;
+  --color-brand-900: #15423b;
+  --color-brand-950: #0a2622;
+
+  --animate-toast-in: toast-in 180ms ease-out;
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    @apply min-h-dvh bg-stone-50 font-sans text-stone-900;
+  }
+
+  ::selection {
+    background-color: var(--color-brand-100);
+  }
+
+  /* Date inputs: keep the native picker but match our type scale. */
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+  }
+}
+
+@utility focus-ring {
+  @apply outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white;
+}
