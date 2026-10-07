@@ -21,12 +21,16 @@ const insightsRouter = require('./routes/insights');
 const app = express();
 
 // CORS: allow comma-separated origins
-const allowedOrigins = env.clientOrigin.split(',').map((o) => o.trim()).filter(Boolean);
+// Entries may use a wildcard, e.g. https://*.vercel.app for Vercel preview deployments.
+const allowedOrigins = env.clientOrigin.split(',').map((o) => o.trim().replace(/\/$/, '')).filter(Boolean);
+const originPatterns = allowedOrigins.map(
+  (o) => new RegExp(`^${o.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[a-z0-9-]+')}$`, 'i')
+);
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (e.g. curl, Postman, same-origin)
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+      if (!origin || originPatterns.some((pattern) => pattern.test(origin))) return callback(null, true);
       callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,

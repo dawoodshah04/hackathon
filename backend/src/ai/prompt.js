@@ -17,6 +17,11 @@
  * @param {{ transcript: string, directory: Array<{id,name,role,specialization,skills}>, meetingDate: string }} opts
  * @returns {Array<{role:'system'|'user', content:string}>}
  */
+function weekday(iso) {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  return isNaN(d.getTime()) ? 'unknown weekday' : d.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+}
+
 function buildMessages({ transcript, directory, meetingDate }) {
   const systemPrompt = `You are a project-management assistant. Your job is to read a meeting transcript and extract a structured list of projects and tasks.
 
@@ -25,7 +30,8 @@ OUTPUT RULES (read carefully — every rule is mandatory):
 1. Return ONLY a JSON object that exactly matches this schema — no prose, no markdown, no code fences:
    {"projects":[{"name":"...","clientName":"...","description":"...","managerId":"...","deadline":"YYYY-MM-DD","tasks":[{"title":"...","description":"...","assigneeId":"...","deadline":"YYYY-MM-DD","estimatedHours":<number>}]}]}
 
-2. IDs ONLY from the directory. Match spoken first names to the id column in the directory table. If a person's name does not appear in the directory (clients, outside contacts, end-users) do NOT assign them — set the relevant field to null. Never invent an id.
+2. IDs ONLY from the directory. Match spoken first names to the id column in the directory table. People not in the directory (clients, outside contacts, end-users) are never assigned. managerId must be a MANAGER id and assigneeId must be an AGENT id. Never invent an id.
+   If nobody is named for a task (or the named person is not a directory AGENT), choose the AGENT whose specialization and skills best fit the task. If no manager is named, choose the MANAGER whose specialization best fits the project.
 
 3. FINAL DECISIONS WIN. If a deadline, estimate, or owner is revised during the meeting, use the LATEST agreed value. If a final recap is present, it is authoritative and overrides everything said earlier.
 
@@ -40,7 +46,13 @@ OUTPUT RULES (read carefully — every rule is mandatory):
 8. Project fields: name and clientName exactly as stated; managerId is the person who explicitly says they manage / will manage the project; deadline is the FINAL project deadline; description is a concise scope summary including explicit exclusions.
    Task fields: title exactly as named in the meeting; description is 1-2 sentences summarising the agreed work; assigneeId is the person who owns the task; deadline and estimatedHours as finally agreed.
 
-9. Never invent projects, tasks, people, hours, or dates. If a required field cannot be determined from the transcript, output null for that field.
+9. Never invent projects or tasks that were not discussed. Every field must still be filled:
+   - clientName: the client named in the meeting; if none, use the project name.
+   - estimatedHours: if no estimate is given, estimate realistic developer hours for the described work.
+   - task deadline: if none is given, use the project deadline. A task deadline is never after its project deadline.
+   - project deadline: if none is given, use the latest task deadline; if there is none either, use the meeting date plus 28 days.
+   - Resolve relative dates ("next Friday", "in two weeks", "end of the month") from the meeting date and its weekday.
+     "this <weekday>" / "by <weekday>" = the first such day after the meeting; "next <weekday>" = that weekday in the following week (7–13 days after the meeting).
 
 ---
 FEW-SHOT EXAMPLE (bakery domain — not related to real transcript):
@@ -78,7 +90,7 @@ Now apply these exact rules to the real meeting transcript provided in the user 
     .join('\n');
 
   const userMessage =
-    `Meeting date: ${meetingDate}\n\n` +
+    `Meeting date: ${meetingDate} (${weekday(meetingDate)})\n\n` +
     `Team directory:\n${header}\n${separator}\n${rows}\n\n` +
     `Full transcript:\n${transcript}`;
 
